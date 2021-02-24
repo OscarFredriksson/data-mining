@@ -2,41 +2,66 @@ import pandas as pd
 import tensorflow as tf
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder
+from matplotlib import pyplot as plt
+import time
+
+# learning_rate=0.0001
+
+# from sklearn.preprocessing import OneHotEncoder
+from tensorflow.keras.utils import to_categorical
 
 
-loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+def split_features_labels(dataset):
+    features = dataset.copy()
+
+    features.pop("class_e")
+    features.pop("class_p")
+
+    labels = dataset[["class_e", "class_p"]].copy()
+
+    return features, labels
 
 
-def loss(model, x, y, training):
-    # training=training is needed only if there are layers with different
-    # behavior during training versus inference (e.g. Dropout).
-    y_ = model(x, training=training)
+def one_hot_encode(dataset):
 
-    return loss_object(y_true=y, y_pred=y_)
+    return pd.get_dummies(dataset, columns=dataset.columns)
 
 
-alphabet = "abcdefghijklmnopqrstuvwxyz"
+def train_model(x, y, epochs, hidden_layer):
+    model = tf.keras.models.Sequential(
+        [
+            tf.keras.layers.Flatten(input_shape=(112,)),
+        ]
+    )
 
-# define a mapping of chars to integers
-char_to_int = dict((c, i) for i, c in enumerate(alphabet))
-int_to_char = dict((i, c) for i, c in enumerate(alphabet))
+    if hidden_layer:
+        model.add(tf.keras.layers.Dense(10, activation="relu", name="hidden_layer1"))
 
+    model.add(tf.keras.layers.Dense(2))
 
-def one_hot_encode(data_array):
+    # model.add(tf.keras.layers.Softmax())
 
-    print(data_array)
+    predictions = model(train_features)
 
-    integer_encoded = [char_to_int[char] for char in data_array]
+    loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
 
-    # one hot encode
-    onehot_encoded = list()
-    for value in integer_encoded:
-        letter = [0 for _ in range(len(alphabet))]
-        letter[value] = 1
-        onehot_encoded.append(letter)
+    model.compile(
+        loss=loss_fn,
+        optimizer=tf.keras.optimizers.Adam(),
+        metrics=["accuracy"],
+    )
 
-    return onehot_encoded
+    start_time = time.time()
+
+    history = model.fit(x=x, y=y, epochs=epochs)
+
+    exec_time = str(round((time.time() - start_time), 2))
+
+    print("\nTraining took:\t" + exec_time + " seconds\n")
+
+    model.evaluate(test_features, test_labels, verbose=2)
+
+    return history
 
 
 # column_names = ["sepal_length", "sepal_width", "petal_length", "petal_width", "species"]
@@ -70,36 +95,36 @@ df = pd.read_csv("mushrooms.csv", names=column_names)
 
 df.pop("stalk-root")
 
+df = one_hot_encode(df)
+
 train, test = train_test_split(df, test_size=0.3)
 
-print(df.dtypes)
+train_features, train_labels = split_features_labels(train)
+test_features, test_labels = split_features_labels(test)
 
-print(df.shape)
+train_features = np.array(train_features)
+train_labels = np.array(train_labels)
 
-print(train.head())
+test_features = np.array(test_features)
+test_labels = np.array(test_labels)
 
-train_features = train.copy()
+# train_features = one_hot_encode(train_features)
+# train_labels = one_hot_encode(train_labels)
+# test_features = one_hot_encode(test_features)
+# test_labels = one_hot_encode(test_labels)
 
-train_features = pd.DataFrame(data=train_features, columns=column_names)
+epochs = 10
 
-train_features.pop("class")
+history_no_hidden_nodes = train_model(train_features, train_labels, epochs, False)
+history_hidden_nodes = train_model(train_features, train_labels, epochs, True)
 
-train_features_converted = pd.get_dummies(
-    train_features, columns=train_features.columns
-)
+plt.plot(history_no_hidden_nodes.history["accuracy"], label="No hidden layer")
+plt.plot(history_hidden_nodes.history["accuracy"], label="One hidden layer")
 
-print(train_features_converted)
+plt.legend()
 
-model = tf.keras.models.Sequential(
-    [
-        tf.keras.layers.Flatten(input_shape=(112,)),
-        tf.keras.layers.Dense(128, activation="relu"),
-        tf.keras.layers.Dropout(0.2),
-        tf.keras.layers.Dense(2),
-    ]
-)
+plt.title("Accuracy per epoch of training")
+plt.ylabel("Accuracy")
+plt.xlabel("Epoch")
 
-predictions = model(np.array(train_features_converted))
-print(predictions)
-
-print(tf.nn.softmax(predictions).numpy())
+plt.savefig("accuracy")
