@@ -30,12 +30,13 @@ def one_hot_encode(dataset):
 def train_model(x, y, epochs, hidden_layer):
     model = tf.keras.models.Sequential(
         [
-            tf.keras.layers.Flatten(input_shape=(112,)),
+            tf.keras.layers.Input(shape=(112,)),
+            tf.keras.layers.Activation(activation="sigmoid"),
         ]
     )
 
     if hidden_layer:
-        model.add(tf.keras.layers.Dense(10, activation="relu", name="hidden_layer1"))
+        model.add(tf.keras.layers.Dense(10, activation="sigmoid", name="hidden_layer1"))
 
     model.add(tf.keras.layers.Dense(2))
 
@@ -97,6 +98,8 @@ df.pop("stalk-root")
 
 df = one_hot_encode(df)
 
+# print(df)
+
 train, test = train_test_split(df, test_size=0.3)
 
 train_features, train_labels = split_features_labels(train)
@@ -113,13 +116,13 @@ test_labels = np.array(test_labels)
 # test_features = one_hot_encode(test_features)
 # test_labels = one_hot_encode(test_labels)
 
-epochs = 10
+epochs = 50
 
 history_no_hidden_nodes = train_model(train_features, train_labels, epochs, False)
 history_hidden_nodes = train_model(train_features, train_labels, epochs, True)
 
 plt.plot(history_no_hidden_nodes.history["accuracy"], label="No hidden layer")
-plt.plot(history_hidden_nodes.history["accuracy"], label="One hidden layer")
+plt.plot(history_hidden_nodes.history["accuracy"], label="One hidden layers")
 
 plt.legend()
 
